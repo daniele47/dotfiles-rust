@@ -11,7 +11,7 @@ TODO:
     - [ ] `s` to show file/script in its entirety
     - [ ] `e` to edit the file?
     - [ ] `d` to delete the file?
-    ...
+- [ ] profile `resolve` should be rewritten, in a way i like + optimized removing not composite profiles from stack!
 
 ## v2.0.0
 

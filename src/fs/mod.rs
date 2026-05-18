@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use tracing::{debug, instrument, trace};
+use tracing::{debug, instrument};
 
 use crate::fs::abs::AbsPathStr;
 
@@ -15,15 +15,13 @@ pub mod rel;
 
 #[derive(Debug, Default)]
 pub struct FindCache {
-    stack: Vec<AbsPathStr>,
+    stack_visit: Vec<bool>,
+    stack_items: Vec<Option<AbsPathStr>>,
 }
 impl FindCache {
-    pub fn new() -> Self {
-        Self { stack: vec![] }
-    }
-
     fn clear(&mut self) {
-        self.stack.clear();
+        self.stack_visit.clear();
+        self.stack_items.clear();
     }
 }
 
@@ -46,22 +44,52 @@ impl AbsPathStr {
     }
 
     #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
-    pub fn find<F>(&self, on_each: F, cache: &mut FindCache) -> anyhow::Result<()>
+    pub fn find<F>(&self, mut on_each: F, cache: &mut FindCache) -> anyhow::Result<()>
     where
-        F: Fn(AbsPathStr) -> anyhow::Result<()>,
+        F: FnMut(AbsPathStr) -> anyhow::Result<()>,
     {
         cache.clear();
-        let stack = &mut cache.stack;
-        stack.push(self.clone());
+        let stack_visit = &mut cache.stack_visit;
+        let stack_items = &mut cache.stack_items;
 
-        while let Some(item) = stack.pop() {
+        // iterate on root children
+        self.list(|child| {
+            if child.is_dir() {
+                stack_visit.push(false);
+                stack_items.push(Some(child));
+            } else {
+                on_each(child)?;
+            }
+            Ok(())
+        })?;
+
+        // 3 colors DFS
+        while let Some(visited) = stack_visit.pop() {
+            let item = stack_items
+                .pop()
+                .expect("empty item stack")
+                .expect("None item");
+
+            // grey -> black: item already visited, aka we explored all from here, and backtracked
+            if visited {
+                on_each(item)?;
+                continue;
+            }
+
+            // iterate on children
+            let item_index = stack_items.len();
+            stack_visit.push(true);
+            stack_items.push(None);
             item.list(|child| {
                 if child.is_dir() {
-                    stack.push(child.clone());
+                    stack_visit.push(false);
+                    stack_items.push(Some(child));
+                } else {
+                    on_each(child)?;
                 }
-                on_each(child)?;
                 Ok(())
             })?;
+            stack_items[item_index] = Some(item);
         }
 
         Ok(())
