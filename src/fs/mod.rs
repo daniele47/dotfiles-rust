@@ -29,9 +29,9 @@ impl FindCache {
 
 impl AbsPathStr {
     #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
-    pub fn list_filtered<F>(&self, on_each: F) -> anyhow::Result<()>
+    pub fn list<F>(&self, mut on_each: F) -> anyhow::Result<()>
     where
-        F: Fn(AbsPathStr) -> anyhow::Result<()>,
+        F: FnMut(AbsPathStr) -> anyhow::Result<()>,
     {
         fs::read_dir(self.path())
             .with_context(|| {
@@ -40,87 +40,32 @@ impl AbsPathStr {
             })?
             .map(|e| {
                 let e = e.with_context(|| format!("Failed to read entry in {}", self.display()))?;
-                trace!(file = %e.path().display(), "Listed path inside directory:");
                 AbsPathStr::new_from_pathbuf(e.path())
             })
             .try_for_each(|e| on_each(e?))
     }
 
-    // #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
-    // pub fn find_filtered<F>(&self, on_each: F, cache: &mut FindCache) -> anyhow::Result<()>
-    // where
-    //     F: Fn(AbsPathStr) -> anyhow::Result<()>,
-    // {
-    //     cache.clear();
-    //     let stack = &mut cache.stack;
-    //     let filtered_out = &mut cache.filtered_out;
-    //     let buffer = &mut cache.buffer;
-    //     let mut root_dir_used = false;
-    //
-    //     loop {
-    //         // get next stack item
-    //         let item: &AbsPathStr;
-    //         if !root_dir_used {
-    //             item = self;
-    //             root_dir_used = true;
-    //         } else {
-    //             if let Some((item_index, filtered_index)) = stack.pop() {
-    //                 if let Some(ri) = item_index {
-    //                     item = &paths[ri];
-    //                 } else if let Some(fi) = filtered_index {
-    //                     item = &filtered_out[fi];
-    //                 } else {
-    //                     unreachable!("Items must be in res or in filtered")
-    //                 }
-    //             } else {
-    //                 break;
-    //             }
-    //         }
-    //
-    //         // append children to vector + push chilren dirs to stack
-    //         item.list_all(buffer)?;
-    //         for child in buffer.drain(..) {
-    //             trace!(file = %child.display(), "Found path recursively inside directory:");
-    //             if filter(&child) {
-    //                 if child.is_dir() {
-    //                     trace!(directory = %child.display(), "Directory added to stack:");
-    //                     stack.push((Some(paths.len()), None));
-    //                 }
-    //                 paths.push(child);
-    //             } else {
-    //                 trace!(file = %child.display(), "Found path got filtered out:");
-    //                 if child.is_dir() {
-    //                     trace!(directory = %child.display(), "Directory added to stack:");
-    //                     stack.push((None, Some(filtered_out.len())));
-    //                 }
-    //                 filtered_out.push(child);
-    //             }
-    //         }
-    //     }
-    //
-    //     Ok(())
-    // }
-    //
-    // #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
-    // pub fn all_files<F>(
-    //     self,
-    //     files: &mut Vec<AbsPathStr>,
-    //     cache: &mut FindCache,
-    //     filter: impl Fn(&AbsPathStr) -> bool,
-    // ) -> anyhow::Result<()> {
-    //     if self.is_file() {
-    //         trace!(path=%self.display(), "Path is a file:");
-    //         if filter(&self) {
-    //             files.push(self);
-    //         }
-    //     } else if self.is_dir() {
-    //         trace!(path=%self.display(), "Path is a directory:");
-    //         self.find_filtered(files, cache, |f| f.is_file() && filter(f))?;
-    //     } else {
-    //         trace!(path=%self.display(), "Path is neither a file nor a directory:");
-    //     }
-    //     Ok(())
-    // }
+    #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
+    pub fn find<F>(&self, on_each: F, cache: &mut FindCache) -> anyhow::Result<()>
+    where
+        F: Fn(AbsPathStr) -> anyhow::Result<()>,
+    {
+        cache.clear();
+        let stack = &mut cache.stack;
+        stack.push(self.clone());
+
+        while let Some(item) = stack.pop() {
+            item.list(|child| {
+                if child.is_dir() {
+                    stack.push(child.clone());
+                }
+                on_each(child)?;
+                Ok(())
+            })?;
+        }
+
+        Ok(())
+    }
 
     #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
     pub fn purge_path_opts(&self, allow_recursive_delete: bool) -> anyhow::Result<()> {
