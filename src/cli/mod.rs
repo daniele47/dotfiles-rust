@@ -1,11 +1,12 @@
 use clap::{Parser, Subcommand};
 
 use crate::{
+    cli::{ctx::CliContext, log::LogOptions},
     fs::{abs::AbsPathStr, rel::RelPathStr},
-    log::LogOptions,
 };
 
 pub mod ctx;
+pub mod log;
 
 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
 #[command(version)]
@@ -63,6 +64,9 @@ impl Cli {
     pub fn run(&self) -> anyhow::Result<()> {
         // enable logging
         LogOptions::new(self.log.as_deref().unwrap_or("off")).init();
+
+        // init context
+        let _ = CliContext::new(self)?;
 
         Ok(())
     }
