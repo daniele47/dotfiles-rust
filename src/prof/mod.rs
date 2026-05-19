@@ -85,12 +85,12 @@ impl Profile {
                     .chain(path.get(pos))
                     .map(|s| s.to_string_lossy())
                     .collect::<Vec<_>>()
-                    .join(" → ");
+                    .join(" --> ");
                 let name = self.name().display();
                 bail!(format!("Profile {name} has a dependency cycle: {cycle}"));
             }
 
-            // check if leaf profile
+            // load profile
             let item_profile = params.all_profiles.get(item_name).with_context(|| {
                     let name = self.name().to_string_lossy();
                     let inv_par = path.last().map(|p|p.to_string_lossy()).unwrap_or(name.clone());
@@ -107,19 +107,16 @@ impl Profile {
             })?;
 
             // end traversal if it was a duplicate, otherwise add to visited set
-            if !params.allow_duplicates && visited.contains(&item_name) {
+            if !visited.insert(item_name) && !params.allow_duplicates {
                 continue;
             }
-            visited.insert(item_name);
 
             // add item and children to stack + add item to path if composite
-            if matches!(item_profile.kind(), ProfileKind::Composite(_)) {
+            if let ProfileKind::Composite(composite) = item_profile.kind() {
                 path.push(item_name);
                 stack.push((item_name, true));
-                if let ProfileKind::Composite(composite) = item_profile.kind() {
-                    for child in composite.entries().iter().rev() {
-                        stack.push((child.child(), false));
-                    }
+                for child in composite.entries().iter().rev() {
+                    stack.push((child.child(), false));
                 }
             }
         }
