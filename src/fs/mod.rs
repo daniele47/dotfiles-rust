@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, DirEntry, File},
+    fs::{self, File, ReadDir},
     io::Read,
     path::Component,
 };
@@ -24,16 +24,11 @@ impl FindCache {
 }
 
 impl AbsPathStr {
-    fn list_raw<F>(&self, mut on_each: F) -> anyhow::Result<()>
-    where
-        F: FnMut(DirEntry) -> anyhow::Result<()>,
-    {
-        fs::read_dir(self.path())
-            .with_context(|| {
-                let p = self.display();
-                format!("Could not list files in directory {p}")
-            })?
-            .try_for_each(|e| on_each(e?))
+    fn list_raw(&self) -> anyhow::Result<ReadDir> {
+        fs::read_dir(self.path()).with_context(|| {
+            let p = self.display();
+            format!("Could not list files in directory {p}")
+        })
     }
 
     #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
@@ -41,8 +36,10 @@ impl AbsPathStr {
     where
         F: FnMut(AbsPathStr) -> anyhow::Result<()>,
     {
-        trace!(directory=%self.display(), "Finding files recursively in directory:");
-        self.list_raw(|e| on_each(AbsPathStr::new_from_pathbuf(e.path())?))
+        trace!(directory=%self.display(), "Finding files in directory:");
+        self.list_raw()?
+            .map(|e| anyhow::Ok(AbsPathStr::new_from_pathbuf(e?.path())?))
+            .try_for_each(|e| on_each(e?))
     }
 
     #[instrument(err, level = "trace", skip_all, fields(self = %self.display()))]
@@ -55,31 +52,32 @@ impl AbsPathStr {
         trace!(directory=%self.display(), "Finding files recursively in directory:");
 
         // iterate on root children
-        self.list_raw(|child_raw| {
+        self.list_raw()?.try_for_each(|child_raw| {
+            let child_raw = child_raw?;
             let child = AbsPathStr::new_from_pathbuf(child_raw.path())?;
             if child_raw.file_type()?.is_dir() {
                 stack.push(child);
             } else {
                 on_each(child)?;
             }
-            Ok(())
+            anyhow::Ok(())
         })?;
 
         // DFS exploration
         while let Some(stack_item) = stack.pop() {
             // iterate on children
-            stack_item.list_raw(|child_raw| {
+            let mut children = stack_item.list_raw()?;
+            on_each(stack_item)?;
+            children.try_for_each(|child_raw| {
+                let child_raw = child_raw?;
                 let child = AbsPathStr::new_from_pathbuf(child_raw.path())?;
                 if child_raw.file_type()?.is_dir() {
                     stack.push(child);
                 } else {
                     on_each(child)?;
                 }
-                Ok(())
+                anyhow::Ok(())
             })?;
-
-            // act on current stack item
-            on_each(stack_item)?;
         }
 
         Ok(())
