@@ -51,32 +51,29 @@ impl AbsPathStr {
     {
         cache.clear();
         let stack = &mut cache.stack;
+        let mut root_traversed = false;
+        let mut children;
         trace!(directory=%self.display(), "Finding files recursively in directory:");
 
-        // iterate on root children
-        self.list_raw()?.try_for_each(|child_raw| {
-            let child_raw = child_raw?;
-            let child = AbsPathStr::new_from_pathbuf(child_raw.path())?;
-            if child_raw.file_type()?.is_dir() {
-                stack.push((child, child_raw));
+        loop {
+            let item = stack.pop();
+            if !root_traversed {
+                children = self.list_raw()?;
+                root_traversed = true;
+            } else if let Some((abs, dir_entry)) = item {
+                children = abs.list_raw()?;
+                on_each(abs, dir_entry)?;
             } else {
-                on_each(child, child_raw)?;
+                break;
             }
-            anyhow::Ok(())
-        })?;
 
-        // DFS exploration
-        while let Some((stack_item, stack_dir)) = stack.pop() {
-            // iterate on children
-            let mut children = stack_item.list_raw()?;
-            on_each(stack_item, stack_dir)?;
-            children.try_for_each(|child_raw| {
-                let child_raw = child_raw?;
-                let child = AbsPathStr::new_from_pathbuf(child_raw.path())?;
-                if child_raw.file_type()?.is_dir() {
-                    stack.push((child, child_raw));
+            children.try_for_each(|dir_entry| {
+                let dir_entry = dir_entry?;
+                let abs = AbsPathStr::new_from_pathbuf(dir_entry.path())?;
+                if dir_entry.file_type()?.is_dir() {
+                    stack.push((abs, dir_entry));
                 } else {
-                    on_each(child, child_raw)?;
+                    on_each(abs, dir_entry)?;
                 }
                 anyhow::Ok(())
             })?;
