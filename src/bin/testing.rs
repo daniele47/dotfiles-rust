@@ -6,19 +6,14 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 fn main() -> anyhow::Result<()> {
     init_logs();
 
-    let abs = AbsPathStr::from_str("/")?;
-    let mut count = 0;
+    let abs = AbsPathStr::from_str("/home/daniele/.config/nvim")?;
     abs.find(
         |e| {
-            count += 1;
-            if count % 1024 == 0 {
-                println!("{count}");
-            }
+            println!("{e:?}");
             Ok(())
         },
         &mut Default::default(),
     )?;
-    println!("{count}");
 
     Ok(())
 }

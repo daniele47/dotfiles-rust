@@ -12,6 +12,7 @@ TODO:
     - [ ] `e` to edit the file?
     - [ ] `d` to delete the file?
 - [ ] profile `resolve` should be rewritten, in a way i like + optimized removing not composite profiles from stack!
+- [ ] `find` method should be fixed to allow consuming directories before their children, avoiding clones
 
 ## v2.0.0
 
