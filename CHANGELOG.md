@@ -13,7 +13,6 @@ TODO:
     - [ ] `q` to quit entirely (avoiding dirty ctrl+c)
 - [ ] `all` profile reserved for ALL profiles! (`config/all.conf` needs to be an error)
 - [ ] error if `profile.conf` and `profile/` both exist, as they would be competing!
-- [ ] decide if to add `interment` for `PathBuf` in `PathStr`, as those end up repeating often!
 - [ ] improve error messages
 
 ## v2.0.0

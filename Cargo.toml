@@ -12,4 +12,5 @@ opt-level = 3 # Keep optimizations but with symbols
 [dependencies]
 anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive", "env", "wrap_help"] }
+internment = "0.8.6"
 owo-colors = "4.3.0"
