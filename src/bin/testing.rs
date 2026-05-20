@@ -1,28 +1,12 @@
-use std::{
-    io::{Write, stdout},
-    time::Instant,
-};
+use std::env;
 
-use autosaver::fs::abs::AbsPathStr;
+use anyhow::Context;
+use autosaver::{cli::ctx::CliContext, fs::abs::AbsPathStr};
 
 fn main() -> anyhow::Result<()> {
-    // let abs = AbsPathStr::try_from(env!("HOME").to_string() + "")?;
-    let abs = AbsPathStr::try_from("/tmp".to_string())?;
-    let time = Instant::now();
-    let mut count = 0;
-    abs.find(|ctx| {
-        count += 1;
-        println!("{}", ctx.path.display());
-        if count % 1024 == 0 {
-            // print!("\r{count}");
-            stdout().flush()?;
-        }
-        // println!("PATH ({}): {}", ctx.depth, ctx.path.display());
-        Ok(true)
-    })
-    .unwrap();
-    println!("{count}");
-    println!("Function took: {:?}", time.elapsed());
+    let home = AbsPathStr::new_from_pathbuf(env::home_dir().context("err")?)?;
+    let root = AbsPathStr::new_from_pathbuf(env::current_dir()?)?;
+    let _ = CliContext::new(&Some(home), &Some(root))?;
 
     Ok(())
 }
