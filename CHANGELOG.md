@@ -10,8 +10,8 @@ TODO:
     - [ ] `s` to show file/script in its entirety
     - [ ] `e` to edit the file?
     - [ ] `d` to delete the file?
+    - [ ] `q` to quit entirely (avoiding dirty ctrl+c)
 - [ ] `all` profile could be reserved for all profiles?
-- [ ] `default` profile could be reserved to specify what to run when no profiles are specified otherwise? this would be fallback if `--profile` flag is not passed
 - [ ] improve error messages
 
 ## v2.0.0

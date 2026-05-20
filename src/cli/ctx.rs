@@ -4,9 +4,7 @@ use anyhow::Context;
 
 use crate::{
     fs::{abs::AbsPathStr, rel::RelPathStr},
-    prof::{
-        AllProfiles, Profile,
-    },
+    prof::{AllProfiles, Profile},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -21,13 +19,19 @@ pub enum Paths {
 pub struct CliContext {
     paths: HashMap<Paths, AbsPathStr>,
     profiles: AllProfiles,
+    all_name: RelPathStr,
 }
 
 impl CliContext {
     pub fn new(home: &Option<AbsPathStr>, root: &Option<AbsPathStr>) -> anyhow::Result<Self> {
         let paths = Self::load_paths(home, root)?;
         let profiles = Self::load_profiles(&paths[&Paths::Config])?;
-        Ok(Self { paths, profiles })
+        let all_name = RelPathStr::from_str("all")?;
+        Ok(Self {
+            paths,
+            profiles,
+            all_name,
+        })
     }
 
     fn load_paths(
@@ -106,5 +110,9 @@ impl CliContext {
 
     pub fn profiles(&self) -> &AllProfiles {
         &self.profiles
+    }
+
+    pub fn all_name(&self) -> &RelPathStr {
+        &self.all_name
     }
 }
